@@ -38,7 +38,8 @@ begin
     where idViaje = v_idViaje;
 
     insert into tickets(idTicket, idViaje, fechaCompra, cantidad, precio)
-    values (seq_tickets.NEXTVAL, v_idViaje, SYSDATE, arg_nroPlazas, arg_nroPlazas * v_precio);
+    values (seq_tickets.nextval, v_idViaje, sysdate, arg_nroPlazas, arg_nroPlazas * v_precio);
+    
 exception
     when c_noViaje then
         raise_application_error(-20002, 'No existe ese viaje para esa fecha, hora, origen y destino.');
