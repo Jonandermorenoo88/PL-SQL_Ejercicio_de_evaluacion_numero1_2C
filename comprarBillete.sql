@@ -8,7 +8,8 @@ create or replace procedure comprarBillete(
     v_idViaje viajes.idViaje%type;
     v_precio recorridos.precio%type;
     v_numPlazasLibres viajes.nPlazasLibres%type;
-    c_noViaje EXCEPTION;
+    c_noViaje exception;
+    c_noPlazas exception;
 
 begin
   begin
@@ -25,5 +26,9 @@ begin
         when no_data_found then
             RAISE c_noViaje;
     end;
+
+     if v_numPlazasLibres < arg_nroPlazas then
+        RAISE c_noPlazas;
+    end if;
   
 end comprarBillete;
