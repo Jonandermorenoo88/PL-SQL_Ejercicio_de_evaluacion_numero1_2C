@@ -10,6 +10,8 @@ create or replace procedure comprarBillete(
     v_numPlazasLibres viajes.nPlazasLibres%type;
     c_noViaje exception;
     c_noPlazas exception;
+    pragma exception_init(c_noViaje, -20002);
+    pragma exception_init(c_noPlazas, -20001);
 
 begin
   begin
@@ -37,5 +39,12 @@ begin
 
     insert into tickets(idTicket, idViaje, fechaCompra, cantidad, precio)
     values (seq_tickets.NEXTVAL, v_idViaje, SYSDATE, arg_nroPlazas, arg_nroPlazas * v_precio);
+exception
+    when c_noViaje then
+        raise_application_error(-20002, 'No existe ese viaje para esa fecha, hora, origen y destino.');
+    when c_noPlazas then
+        raise_application_error(-20001, 'Plazas insuficientes. Se solicitaron ' || arg_nroPlazas || ' y solo quedan ' || v_numPlazasLibres);
+    when others then
+        raise;
 
 end comprarBillete;
