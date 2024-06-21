@@ -30,5 +30,9 @@ begin
      if v_numPlazasLibres < arg_nroPlazas then
         RAISE c_noPlazas;
     end if;
-  
+
+    update viajes
+    set nPlazasLibres = nPlazasLibres - arg_nroPlazas
+    where idViaje = v_idViaje;
+    
 end comprarBillete;
