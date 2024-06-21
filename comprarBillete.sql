@@ -34,5 +34,8 @@ begin
     update viajes
     set nPlazasLibres = nPlazasLibres - arg_nroPlazas
     where idViaje = v_idViaje;
-    
+
+    insert into tickets(idTicket, idViaje, fechaCompra, cantidad, precio)
+    values (seq_tickets.NEXTVAL, v_idViaje, SYSDATE, arg_nroPlazas, arg_nroPlazas * v_precio);
+
 end comprarBillete;
