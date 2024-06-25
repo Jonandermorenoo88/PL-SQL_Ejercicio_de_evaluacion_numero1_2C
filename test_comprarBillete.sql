@@ -1,9 +1,17 @@
 create or replace procedure test_comprarBillete is
 begin
-     -- 1 Comprar un billete para un viaje inexistente
-     begin
-       comprarBillete( '1/1/1 12:00:00', '15/04/2010', 'Burgos', 'Madrid', 3);
-      end;
+      -- 1. Comprar un billete para un viaje inexistente
+    begin
+        comprarBillete(TIMESTAMP '0001-01-01 12:00:00', DATE '2010-04-15', 'Burgos', 'Madrid', 3);
+        DBMS_OUTPUT.PUT_LINE('Mal no detecta NO_EXISTE_VIAJE.');
+    EXCEPTION
+        when OTHERS then
+            if SQLCODE = -20002 then
+                DBMS_OUTPUT.PUT_LINE('Detecta OK NO_EXISTE_VIAJE: ' || SQLERRM);
+            else
+                DBMS_OUTPUT.PUT_LINE('Mal no detecta NO_EXISTE_VIAJE: ' || SQLERRM);
+            end if;
+    end;
       
      -- 2 Comprar un billete de 50 plazas en un vieje que no tiene tantas plazas libres
      begin
