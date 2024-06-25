@@ -62,6 +62,7 @@ create table tickets(
 );
 drop sequence seq_tickets;
 create sequence seq_tickets;
+--start with 5;
 
 create table revisionesAutocar(
  idRevisionA    integer  primary key,
@@ -154,40 +155,128 @@ insert into tickets (	idTicket, idViaje, fechaCompra,	cantidad, precio)
 commit;
 --exit;
 
-create or replace procedure comprarBillete( arg_hora recorridos.horaSalida%type,
-          arg_fecha viajes.fecha%type, arg_origen recorridos.estacionorigen%type,
-          arg_destino recorridos.estaciondestino%type, arg_nroPlazas viajes.nplazaslibres%type
+--procedure comprarBillete
+create or replace procedure comprarBillete( 
+    arg_hora recorridos.horaSalida%type,
+    arg_fecha viajes.fecha%type, 
+    arg_origen recorridos.estacionorigen%type,
+    arg_destino recorridos.estaciondestino%type, 
+    arg_nroPlazas viajes.nplazaslibres%type
 ) is 
+    v_idViaje viajes.idViaje%type;
+    v_precio recorridos.precio%type;
+    v_numPlazasLibres viajes.nPlazasLibres%type;
+    c_noViaje exception;
+    c_noPlazas exception;
+    pragma exception_init(c_noViaje, -20002);
+    pragma exception_init(c_noPlazas, -20001);
 
 begin
+  begin
+        select v.idViaje, r.precio, v.nPlazasLibres
+        into v_idViaje, v_precio, v_numPlazasLibres
+        from viajes v
+        join recorridos r on v.idRecorrido = r.idRecorrido
+        where r.estacionOrigen = arg_origen
+          and r.estacionDestino = arg_destino
+          and to_char(r.horaSalida, 'HH24:MI:SS') = to_char(arg_hora, 'HH24:MI:SS')
+          and v.fecha = arg_fecha
+        for update of v.nPlazasLibres;
+    exception
+        when no_data_found then
+            RAISE c_noViaje;
+    end;
 
-  null;
-  
-end;
+     if v_numPlazasLibres < arg_nroPlazas then
+        RAISE c_noPlazas;
+    end if;
+
+    update viajes
+    set nPlazasLibres = nPlazasLibres - arg_nroPlazas
+    where idViaje = v_idViaje;
+
+    insert into tickets(idTicket, idViaje, fechaCompra, cantidad, precio)
+    values (seq_tickets.nextval, v_idViaje, sysdate, arg_nroPlazas, arg_nroPlazas * v_precio);
+    
+exception
+    when c_noViaje then
+        raise_application_error(-20002, 'No existe ese viaje para esa fecha, hora, origen y destino.');
+    when c_noPlazas then
+        raise_application_error(-20001, 'Plazas insuficientes. Se solicitaron ' || arg_nroPlazas || ' y solo quedan ' || v_numPlazasLibres);
+    when others then
+        raise;
+
+end comprarBillete;
 /
-		       
+
+commit;
+	       
 create or replace procedure test_comprarBillete is
+  v_numPlazasLibres viajes.nPlazasLibres%TYPE;
 begin
-     -- 1 Comprar un billete para un viaje inexistente
-     begin
-       comprarBillete( '1/1/1 12:00:00', '15/04/2010', 'Burgos', 'Madrid', 3);
-      end;
+      -- 1. Comprar un billete para un viaje inexistente
+    begin
+        comprarBillete(TIMESTAMP '0001-01-01 12:00:00', DATE '2010-04-15', 'Burgos', 'Madrid', 3);
+        DBMS_OUTPUT.PUT_LINE('Mal no detecta NO_EXISTE_VIAJE.');
+    EXCEPTION
+        when OTHERS then
+            if SQLCODE = -20002 then
+                DBMS_OUTPUT.PUT_LINE('Detecta OK NO_EXISTE_VIAJE: ' || SQLERRM);
+            else
+                DBMS_OUTPUT.PUT_LINE('Mal no detecta NO_EXISTE_VIAJE: ' || SQLERRM);
+            end if;
+    end;
       
-     -- 2 Comprar un billete de 50 plazas en un vieje que no tiene tantas plazas libres
-     begin
-       comprarBillete( '1/1/1 8:30:00', '22/01/2009', 'Burgos', 'Madrid', 50);
-     end;
+    -- 2. Verificar si el viaje con fecha '2009-01-22' y hora '08:30:00' existe
+    begin
+        select v.nPlazasLibres
+        into v_numPlazasLibres
+        from viajes v
+        join recorridos r on v.idRecorrido = r.idRecorrido
+        where r.estacionOrigen = 'Burgos'
+          and r.estacionDestino = 'Madrid'
+          and TO_CHAR(r.horaSalida, 'HH24:MI:SS') = '08:30:00'
+          and v.fecha = DATE '2009-01-22';
+
+        comprarBillete(TO_TIMESTAMP('0001-01-01 08:30:00', 'YYYY-MM-DD HH24:MI:SS.FF'), DATE '2009-01-22', 'Burgos', 'Madrid', 50);
+        DBMS_OUTPUT.PUT_LINE('Mal no detecta NO_PLAZAS.');
+    EXCEPTION
+        when OTHERS then
+            if SQLCODE = -20001 then
+                DBMS_OUTPUT.PUT_LINE('Detecta OK NO_PLAZAS: ' || SQLERRM);
+            else
+                if SQLCODE = -20002 then
+                    DBMS_OUTPUT.PUT_LINE('Mal no detecta NO_PLAZAS, pero detecta NO_EXISTE_VIAJE en lugar de NO_PLAZAS: ' || SQLERRM);
+                else
+                    DBMS_OUTPUT.PUT_LINE('Mal no detecta NO_PLAZAS: ' || SQLERRM);
+                end if;
+            end if;
+    end;
       
-      -- 3 Hacemos una compra de un billete de 5 plazas sin problemas
+      -- 3. Hacemos una compra de un billete de 5 plazas sin problemas
       declare
         varContenidoReal varchar(100);
-        varContenidoEsperado    varchar(100):=   'Dummy data';
-      begin
-        comprarBillete( '1/1/1 8:30:00', '22/01/2009', 'Burgos', 'Madrid', 5);
-      end;
-end;
+        varContenidoEsperado    varchar(100):=  '11122/01/0925113550';
+    begin
+        comprarBillete(TO_TIMESTAMP('0001-01-01 08:30:00', 'YYYY-MM-DD HH24:MI:SS.FF'), DATE '2009-01-22', 'Burgos', 'Madrid', 5);
+        
+        select v.idViaje || v.idAutocar || v.idRecorrido || TO_CHAR(v.fecha, 'DD/MM/YY') || v.nPlazasLibres || v.realizado || v.idConductor || t.idTicket || t.cantidad || t.precio
+        into varContenidoReal
+        from viajes v
+        join tickets t ON v.idViaje = t.idViaje
+        where t.idTicket = 3;
+        
+        if varContenidoReal = varContenidoEsperado then
+            DBMS_OUTPUT.PUT_LINE('BIEN: si modifica bien la BD.');
+        else
+            DBMS_OUTPUT.PUT_LINE('Mal: no modifica bien la BD. Real: ' || varContenidoReal || ' Esperado: ' || varContenidoEsperado);
+        end if;
+    EXCEPTION
+        when OTHERS then
+            DBMS_OUTPUT.PUT_LINE('Error inesperado: ' || SQLERRM);
+    end;
+end test_comprarBillete;
 /
-
 
 set serveroutput on
 begin
