@@ -40,11 +40,26 @@ begin
             end if;
     end;
       
-      -- 3 Hacemos una compra de un billete de 5 plazas sin problemas
+      -- 3. Hacemos una compra de un billete de 5 plazas sin problemas
       declare
         varContenidoReal varchar(100);
-        varContenidoEsperado    varchar(100):=   'Dummy data';
-      begin
-        comprarBillete( '1/1/1 8:30:00', '22/01/2009', 'Burgos', 'Madrid', 5);
-      end;
+        varContenidoEsperado    varchar(100):=  '11122/01/0925113550';
+    begin
+        comprarBillete(TO_TIMESTAMP('0001-01-01 08:30:00', 'YYYY-MM-DD HH24:MI:SS.FF'), DATE '2009-01-22', 'Burgos', 'Madrid', 5);
+        
+        select v.idViaje || v.idAutocar || v.idRecorrido || TO_CHAR(v.fecha, 'DD/MM/YY') || v.nPlazasLibres || v.realizado || v.idConductor || t.idTicket || t.cantidad || t.precio
+        into varContenidoReal
+        from viajes v
+        join tickets t ON v.idViaje = t.idViaje
+        where t.idTicket = 3;
+        
+        if varContenidoReal = varContenidoEsperado then
+            DBMS_OUTPUT.PUT_LINE('BIEN: si modifica bien la BD.');
+        else
+            DBMS_OUTPUT.PUT_LINE('Mal: no modifica bien la BD. Real: ' || varContenidoReal || ' Esperado: ' || varContenidoEsperado);
+        end if;
+    EXCEPTION
+        when OTHERS then
+            DBMS_OUTPUT.PUT_LINE('Error inesperado: ' || SQLERRM);
+    end;
 end test_comprarBillete;
